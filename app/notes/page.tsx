@@ -1,0 +1,27 @@
+"use client";
+
+import AppShell from "@/components/AppShell";
+import { Empty, Modal, PageTitle } from "@/components/UI";
+import { isDemoMode } from "@/lib/appMode";
+import { useVault } from "@/lib/store";
+import type { Note } from "@/lib/types";
+import { Bold, Italic, List, Search, Underline } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+
+type NoteForm=Partial<Note>&{tagText?:string};
+
+export default function Notes(){
+  const vault=useVault();
+  const [open,setOpen]=useState(false),[editing,setEditing]=useState<string>(),[form,setForm]=useState<NoteForm>({pinned:false}),[query,setQuery]=useState("");
+  const timer=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
+  const notes=useMemo(()=>[...vault.state.notes].filter(note=>`${note.title} ${stripHtml(note.content)} ${note.tags.join(" ")}`.toLowerCase().includes(query.toLowerCase())).sort((a,b)=>Number(b.pinned)-Number(a.pinned)||b.updatedAt.localeCompare(a.updatedAt)),[vault.state.notes,query]);
+  useEffect(()=>()=>{if(timer.current)clearTimeout(timer.current)},[]);
+  function show(note?:Note){if(isDemoMode)return;setEditing(note?.id);setForm(note?{...note,tagText:note.tags.join(", ")}:{pinned:false});setOpen(true)}
+  function change(patch:Partial<NoteForm>){if(isDemoMode)return;const next={...form,...patch};setForm(next);if(editing){if(timer.current)clearTimeout(timer.current);timer.current=setTimeout(()=>void vault.updateNote(editing,{...next,tags:(next.tagText||"").split(",").map(tag=>tag.trim()).filter(Boolean)}),600)}}
+  async function save(event:React.FormEvent){event.preventDefault();if(isDemoMode)return;const note={...form,tags:(form.tagText||"").split(",").map(tag=>tag.trim()).filter(Boolean)};if(editing)await vault.updateNote(editing,note);else await vault.addNote(note);setOpen(false)}
+  return <AppShell><PageTitle title="Notes" subtitle="Rich, searchable founder knowledge with automatic saving." action={isDemoMode?<span className="badge">Read-only public demo</span>:<button className="btn" onClick={()=>show()}>+ New Note</button>}/><label className="relative mb-6 block max-w-xl"><Search className="absolute left-3 top-3.5 text-slate-500" size={16}/><input className="field pl-10" value={query} onChange={event=>setQuery(event.target.value)} placeholder="Search notes, content and tags"/></label><div className="grid gap-4 md:grid-cols-2">{notes.length?notes.map(note=><article className="card p-5" key={note.id}><div className="flex justify-between gap-4"><div><div className="flex flex-wrap gap-2">{note.pinned&&<span className="badge">Pinned</span>}{note.tags.map(tag=><span className="badge" key={tag}>{tag}</span>)}</div><h2 className="mt-3 text-xl font-black">{note.title}</h2></div>{!isDemoMode&&<div className="flex gap-2"><button className="btn2" onClick={()=>show(note)}>Edit</button><button className="btn2 text-red-300" onClick={()=>confirm("Delete this note?")&&void vault.deleteNote(note.id)}>Delete</button></div>}</div><div className="rich-content muted mt-3 line-clamp-5" dangerouslySetInnerHTML={{__html:safeHtml(note.content)}}/></article>):<Empty title="No notes found"/>}</div>{!isDemoMode&&<Modal open={open} onClose={()=>setOpen(false)} title={editing?"Edit Note · autosaves":"New Note"}><form onSubmit={save} className="space-y-3"><input required className="field" placeholder="Title" value={form.title||""} onChange={event=>change({title:event.target.value})}/><RichEditor value={form.content||""} onChange={content=>change({content})}/><select className="field" value={form.projectId||""} onChange={event=>change({projectId:event.target.value||undefined})}><option value="">No project</option>{vault.state.projects.filter(project=>!project.archivedAt).map(project=><option key={project.id} value={project.id}>{project.name}</option>)}</select><input className="field" placeholder="Tags, comma separated" value={form.tagText||""} onChange={event=>change({tagText:event.target.value})}/><label className="flex items-center gap-3"><input type="checkbox" checked={!!form.pinned} onChange={event=>change({pinned:event.target.checked})}/> Pin note</label><button className="btn w-full">{editing?"Save & Close":"Create Note"}</button></form></Modal>}</AppShell>;
+}
+
+function RichEditor({value,onChange}:{value:string;onChange:(value:string)=>void}){const editor=useRef<HTMLDivElement>(null);useEffect(()=>{if(editor.current&&editor.current.innerHTML!==value)editor.current.innerHTML=value},[value]);function command(name:string){document.execCommand(name);editor.current?.focus();onChange(editor.current?.innerHTML||"")}const tools=[["bold",Bold],["italic",Italic],["underline",Underline],["insertUnorderedList",List]] as const;return <div className="overflow-hidden rounded-2xl border border-white/10"><div className="flex gap-1 border-b border-white/10 bg-white/5 p-2">{tools.map(([name,Icon])=><button type="button" className="btn2 !p-2" aria-label={name} key={name} onClick={()=>command(name)}><Icon size={16}/></button>)}</div><div ref={editor} contentEditable suppressContentEditableWarning className="min-h-48 p-4 outline-none" onInput={event=>onChange(event.currentTarget.innerHTML)}/></div>}
+function stripHtml(value:string){return value.replace(/<[^>]*>/g," ")}
+function safeHtml(value:string){return value.replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi,"").replace(/\son\w+\s*=\s*(["']).*?\1/gi,"").replace(/javascript:/gi,"")}

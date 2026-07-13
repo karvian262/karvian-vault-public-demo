@@ -1,0 +1,6 @@
+const encoder=new TextEncoder(); const decoder=new TextDecoder();
+const bytesToBase64=(bytes:Uint8Array)=>btoa(String.fromCharCode(...bytes));
+const base64ToBytes=(value:string)=>Uint8Array.from(atob(value),c=>c.charCodeAt(0));
+async function deriveKey(masterPassword:string,salt:Uint8Array){const material=await crypto.subtle.importKey("raw",encoder.encode(masterPassword),"PBKDF2",false,["deriveKey"]);return crypto.subtle.deriveKey({name:"PBKDF2",salt:new Uint8Array(salt),iterations:310000,hash:"SHA-256"},material,{name:"AES-GCM",length:256},false,["encrypt","decrypt"])}
+export async function encryptSecret(secret:string,masterPassword:string){const salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12)),key=await deriveKey(masterPassword,salt);const cipher=await crypto.subtle.encrypt({name:"AES-GCM",iv},key,encoder.encode(secret));return {encryptedPassword:bytesToBase64(new Uint8Array(cipher)),iv:bytesToBase64(iv),salt:bytesToBase64(salt)}}
+export async function decryptSecret(encryptedPassword:string,iv:string,salt:string,masterPassword:string){const key=await deriveKey(masterPassword,base64ToBytes(salt));const plain=await crypto.subtle.decrypt({name:"AES-GCM",iv:base64ToBytes(iv)},key,base64ToBytes(encryptedPassword));return decoder.decode(plain)}
