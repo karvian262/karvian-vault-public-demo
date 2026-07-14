@@ -26,8 +26,8 @@ export function useContinuousSpeech({language,deviceId,onFinal,onLowConfidence,o
  const [error,setError]=useState("");
  const [logs,setLogs]=useState<VoiceLog[]>([]);
 
- const recognition=useRef<Recognition>();
- const interruptRecognition=useRef<Recognition>();
+ const recognition=useRef<Recognition|undefined>(undefined);
+ const interruptRecognition=useRef<Recognition|undefined>(undefined);
  const restartTimer=useRef<ReturnType<typeof setTimeout>>();
  const interruptRestartTimer=useRef<ReturnType<typeof setTimeout>>();
  const silenceTimer=useRef<ReturnType<typeof setTimeout>>();

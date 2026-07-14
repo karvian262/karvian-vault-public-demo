@@ -14,7 +14,7 @@ type BootState="BOOT_CHECKING"|"BOOT_PLAYING"|"APP_READY";
 
 export default function StartupExperience(){
  const [bootState,setBootState]=useState<BootState>("BOOT_CHECKING"),[leaving,setLeaving]=useState(false),[elapsed,setElapsed]=useState(0),[skippable,setSkippable]=useState(false);
- const timers=useRef<ReturnType<typeof setTimeout>[]>([]),frame=useRef<number>(),startedAt=useRef(0),finished=useRef(false);
+ const timers=useRef<ReturnType<typeof setTimeout>[]>([]),frame=useRef<number|undefined>(undefined),startedAt=useRef(0),finished=useRef(false);
  const reduced=useRef(false);
  const metrics=useMemo(()=>panels.map(([label,value],index)=>({label,value,id:index})),[]);
  useEffect(()=>{
